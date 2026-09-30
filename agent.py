@@ -13,6 +13,8 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
@@ -107,8 +109,67 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    price_match = re.search(
+        r"(?:under|below|up to|max(?:imum)?)\s*\$?([0-9]+(?:\.[0-9]+)?)",
+        query,
+        re.IGNORECASE,
+    )
+    size_match = re.search(r"\bsize\s+([a-z0-9/]+)\b", query, re.IGNORECASE)
+    description = re.sub(
+        r"(?:under|below|up to|max(?:imum)?)\s*\$?[0-9]+(?:\.[0-9]+)?",
+        "",
+        query,
+        flags=re.IGNORECASE,
+    )
+    description = re.sub(
+        r"\bsize\s+[a-z0-9/]+\b", "", description, flags=re.IGNORECASE
+    )
+    description = re.sub(r"\s+", " ", description).strip(" ,.-")
+
+    session["parsed"] = {
+        "description": description,
+        "size": size_match.group(1) if size_match else None,
+        "max_price": float(price_match.group(1)) if price_match else None,
+    }
+
+    next_step = "search"
+    iterations = 0
+
+    try:
+        while next_step:
+            iterations += 1
+            trace.check_iterations(iterations)
+
+            if next_step == "search":
+                parsed = session["parsed"]
+                session["search_results"] = search_listings(
+                    parsed["description"], parsed["size"], parsed["max_price"]
+                )
+                if not session["search_results"]:
+                    session["error"] = (
+                        "No matching listings were found. Try a higher price, "
+                        "a different size, or fewer description words."
+                    )
+                    next_step = None
+                else:
+                    session["selected_item"] = session["search_results"][0]
+                    next_step = "suggest"
+
+            elif next_step == "suggest":
+                session["outfit_suggestion"] = suggest_outfit(
+                    session["selected_item"], session["wardrobe"]
+                )
+                next_step = "fit_card"
+
+            elif next_step == "fit_card":
+                session["fit_card"] = create_fit_card(
+                    session["outfit_suggestion"], session["selected_item"]
+                )
+                next_step = None
+
+    except ModelUnavailable as exc:
+        session["error"] = str(exc)
+
     return session
 
 
