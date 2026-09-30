@@ -13,8 +13,7 @@
 > python app.py ask 'vintage graphic tee under $30'
 > ```
 >
-> All three tools are stubs, so that last command will do nothing useful yet.
-> That's the starting position.
+> The three tools and planning loop are implemented below.
 >
 > **The rest of this file is your submission.** Fill it in as you go.
 
@@ -41,7 +40,11 @@
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
 
-
+FitFindr lets a user describe a secondhand clothing item, including an optional
+size and maximum price. It searches the local listings and selects the best
+match. It then uses the user's saved wardrobe to suggest an outfit and writes a
+short fit-card caption. If there is no match, it stops and tells the user what
+they can change in the search.
 
 ---
 
@@ -59,24 +62,24 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Searches the local listings using description keywords and optional size and price filters.
+- **Inputs:** `description` (`str`), `size` (`str | None`), and `max_price` (`float | None`). A size is matched as a complete size token, so `M` matches `S/M` but `S` does not match `US 9`.
+- **Returns:** A best-match-first `list[dict]`, where each listing dict contains `id`, `title`, `description`, `category`, `style_tags`, `size`, `condition`, `price`, `colors`, `brand`, and `platform`.
+- **When it has nothing:** Returns an empty list.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Uses the new item and the user's wardrobe to suggest one or two outfits.
+- **Inputs:** `new_item` (`dict`) and `wardrobe` (`dict` with an `items` list).
+- **Returns:** A non-empty `str` containing concise outfit suggestions that name saved wardrobe pieces when available.
+- **When it has nothing:** If the wardrobe has no items, returns general styling advice for the new item instead of failing.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Turns an outfit suggestion and listing into a short social-media caption.
+- **Inputs:** `outfit` (`str`) and `new_item` (`dict`).
+- **Returns:** A two-to-four-sentence `str` that mentions the item, price, platform, and vibe.
+- **When it has nothing:** If `outfit` is empty or whitespace, returns a message explaining that a fit card could not be created.
 
 ---
 
@@ -93,13 +96,20 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a helpful
+message in the session and stop. Otherwise, select the first result, call
+`suggest_outfit`, and then call `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regular expressions extract phrases such as
+`under $30` and `size M`; the remaining text becomes the description.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `query` becomes `parsed`, then the search
+output is saved in `search_results`. Its first item is saved as `selected_item`
+and read from the session by `suggest_outfit`. That output is saved as
+`outfit_suggestion` and read from the session by `create_fit_card`, whose output
+is saved as `fit_card`.
 
 ---
 
@@ -113,25 +123,55 @@
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
 
+Found: Graphic Tee — 2003 Tour Bootleg Style — $24.0 on depop
+
+Outfit: Outfit 1: Y2K Grunge
+- Base: Graphic Tee + Baggy straight-leg jeans (with Brown leather belt)
+- Layer: Black cropped zip hoodie
+- Footwear & Bag: Black combat boots + Black crossbody bag
+
+Outfit 2: Off-Duty Streetwear
+- Base: Graphic Tee (tucked) + Wide-leg khaki trousers (with Brown leather belt)
+- Outerwear: Vintage black denim jacket
+- Footwear & Bag: Chunky white sneakers + Black crossbody bag
+
+Fit card: Scored this ultimate 2003 tour bootleg tee for just $24.00, and it’s
+giving major Y2K grunge and off-duty streetwear energy. Seriously obsessed with
+the faded graphic and vintage wash. Grab it now over on my depop before I change
+my mind and keep it!
 ```
 
 **The three tools, tested one at a time**
 
 ```
-$ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
-
+$ python -c "from tools import search_listings; print([item['title'] for item in search_listings('graphic tee', max_price=30)])"
+['Graphic Tee — 2003 Tour Bootleg Style', 'Y2K Baby Tee — Butterfly Print',
+'Vintage Band Tee — Faded Grey', 'Vintage Graphic Hoodie — Faded Black',
+'Mesh Long-Sleeve Top — Black', 'Low-Rise Cargo Pants — Khaki']
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+Outfit 1: Casual & Sporty
+- Top: White ribbed tank top
+- Outerwear: Oversized grey crewneck sweatshirt
+- Shoes: Chunky white sneakers
+- Accessories: Black crossbody bag
 
+Outfit 2: Edgy & Layered
+- Top: White ribbed tank top
+- Outerwear: Vintage black denim jacket
+- Shoes: Black combat boots
+- Accessories: Brown leather belt, Black crossbody bag
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
-
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('Pair them with a white ribbed tank and chunky white sneakers.', load_listings()[0]))"
+Scored these vintage Levi's 501s for just $38.00 and I am obsessed. The medium
+wash gives off such effortless off-duty model vibes. I’m listing them on depop
+today, but honestly, I might just keep them.
 ```
 
 ---
@@ -147,15 +187,15 @@ $ python -c "from tools import create_fit_card; ..."
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked AI to complete the required tools while keeping the starter simple and changing only what the assignment required.
+- *What came back:* It suggested a keyword search, two short model prompts, and a state-based loop.
+- *What I changed:* I kept those pieces but weighted title and style-tag matches so a cheap, loosely related listing would not beat the item named in the query.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked AI to wire the search result into the next tools without asking the user for the item again.
+- *What came back:* It suggested storing each result in the session and reading it back in the next step.
+- *What I changed:* I used a `next_step` loop and made size parsing require the word `size`, so text such as `midi` is not mistaken for size `M`.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
