@@ -25,9 +25,8 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+I chose 4 of 5 because the search uses keyword overlap rather than a language
+model, so an unusual phrasing may not share enough words with the listing data.
 
 ---
 
@@ -37,13 +36,14 @@ Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+I chose 5 of 5 because this is a fixed branch based on whether the returned
+list is empty. It does not depend on variable model output.
 
 ---
 
-## 3. Something about state
-
+## 3. The selected item carries through session state
+For five matching queries, the `id` in `session["selected_item"]` is the same
+`id` received as `new_item` by `suggest_outfit` — in 5 of 5 tries.
 <!-- YOU WRITE THIS ONE.
 
      How would you know that the item your search found is the same item the
@@ -57,13 +57,15 @@ Given a query that matches no listings, the agent stops before calling
 
 
 **Why this target:**
-
+I chose 5 of 5 because both values come from the same session state. Any
+mismatch means the loop passed the wrong item, not that the model varied.
 
 
 ---
 
-## 4. Something about the fit card
-
+## 4. Fit cards contain the required details
+Given five matching queries, at least 4 of 5 fit cards are two to four
+sentences long and mention the selected item's price and platform.
 <!-- YOU WRITE THIS ONE.
 
      The fit card calls a model, so the same input can produce different words
@@ -78,13 +80,15 @@ Given a query that matches no listings, the agent stops before calling
 
 
 **Why this target:**
-
+I chose 4 of 5 because the caption is model-generated and its wording can
+vary, but most captions should still include the required facts and length.
 
 
 ---
 
-## 5. Your choice
-
+## 5. Search results respect the maximum price
+For five searches with a maximum price, every listing in the returned results
+has a price at or below that maximum — in 5 of 5 tries.
 <!-- YOU WRITE THIS ONE TOO.
 
      Pick something you actually care about getting right. Speed, the empty
@@ -95,7 +99,8 @@ Given a query that matches no listings, the agent stops before calling
 
 
 **Why this target:**
-
+I chose 5 of 5 because the price filter is deterministic. Returning even one
+item over the user's budget would make the search misleading.
 
 
 ---
