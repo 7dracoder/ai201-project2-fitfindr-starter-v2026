@@ -132,6 +132,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         "size": size_match.group(1) if size_match else None,
         "max_price": float(price_match.group(1)) if price_match else None,
     }
+    trace.step("parse_query", inputs=query, returned=session["parsed"])
 
     next_step = "search"
     iterations = 0
@@ -143,11 +144,24 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
             if next_step == "search":
                 parsed = session["parsed"]
-                session["search_results"] = call_tool("search_listings", {
+                search_inputs = {
                     "description": parsed["description"],
                     "size": parsed["size"],
                     "max_price": parsed["max_price"],
-                })
+                }
+                session["search_results"] = call_tool(
+                    "search_listings", search_inputs
+                )
+                trace.step(
+                    "search_listings (via MCP)",
+                    inputs=search_inputs,
+                    returned=session["search_results"],
+                    note=(
+                        "branch: matches found, continue"
+                        if session["search_results"]
+                        else "branch: empty, stop"
+                    ),
+                )
                 if not session["search_results"]:
                     session["error"] = (
                         "No matching listings were found. Try a higher price, "
@@ -162,16 +176,35 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 session["outfit_suggestion"] = suggest_outfit(
                     session["selected_item"], session["wardrobe"]
                 )
+                trace.step(
+                    "suggest_outfit",
+                    inputs=session["selected_item"],
+                    returned=session["outfit_suggestion"],
+                    note=f"wardrobe items: {len(session['wardrobe'].get('items', []))}",
+                )
                 next_step = "fit_card"
 
             elif next_step == "fit_card":
                 session["fit_card"] = create_fit_card(
                     session["outfit_suggestion"], session["selected_item"]
                 )
+                trace.step(
+                    "create_fit_card",
+                    inputs=(
+                        f"item={session['selected_item']['title']}; "
+                        f"outfit={session['outfit_suggestion']}"
+                    ),
+                    returned=session["fit_card"],
+                )
                 next_step = None
 
     except ModelUnavailable as exc:
         session["error"] = str(exc)
+        trace.step(
+            "model_unavailable",
+            returned=session["error"],
+            note="stop and ask the user to check the key or connection",
+        )
 
     return session
 
