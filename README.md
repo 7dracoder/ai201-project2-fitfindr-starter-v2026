@@ -369,19 +369,30 @@ list kept the same shape and the agent behavior did not change.
 
 **What I changed:**
 
+I added one instruction to the `create_fit_card` prompt: write from the buyer's
+perspective and never say the user is selling or listing the item.
+
 **Which failure it was meant to fix:**
+
+The before run contained three cards that said the user had listed an item for
+sale. The prompt named the marketplace but did not explain the user's role, so
+the model sometimes chose a seller perspective.
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Full three-tool run returns a fit card | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Empty search stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item ID reaches `suggest_outfit` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card has 2–4 sentences, price, and platform | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Search results stay at or below the maximum price | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
 **Did it help, and how do I know:**
+
+Yes. The before log had three uses of seller wording such as "listed it on
+depop." The after log had zero uses of `listed`, `listing`, `selling`, or
+`sell`, while all five original criteria remained at 5 of 5.
 
 <!-- If it made things worse, say that. Honestly reported, that earns full
      credit and is more interesting than one that worked. -->
@@ -391,7 +402,11 @@ list kept the same shape and the agent behavior did not change.
 ---
 
 ## What's Still Broken
-
+No acceptance criterion is still missed. Search relevance can still be loose
+because a listing only needs one overlapping description word to be returned.
+I would test and improve that next, but I stopped because this unit allows one
+measured improvement, and I used it on the buyer/seller wording diagnosed in
+the before run.
 <!-- For each criterion still missed: what you'd do, and why you stopped where
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
      left is not. -->
