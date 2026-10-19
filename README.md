@@ -197,6 +197,12 @@ today, but honestly, I might just keep them.
 - *What came back:* It suggested storing each result in the session and reading it back in the next step.
 - *What I changed:* I used a `next_step` loop and made size parsing require the word `size`, so text such as `midi` is not mistaken for size `M`.
 
+**Unit 4 moment**
+
+- *What I asked for:* I asked AI to check whether each unchanged acceptance criterion had a matching test scenario.
+- *What came back:* It mapped the normal run, empty branch, state transfer, fit-card details, and price ceiling to five separate scenarios.
+- *What I changed:* I kept those five mappings and also retained the empty-wardrobe run as a diagnostic rather than counting it as a sixth criterion.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -217,17 +223,44 @@ today, but honestly, I might just keep them.
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Full three-tool run returns a fit card | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Empty search stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item ID reaches `suggest_outfit` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card has 2–4 sentences, price, and platform | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Search results stay at or below the maximum price | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
 **Real output from one try**, pasted as text, naming the file and function
 that produced it:
 
-```
+Produced by `run_eval.py::main`, running `agent.py::run_agent` with caching off.
 
+```text
+Criterion 1, try 1:
+selected_item: Graphic Tee — 2003 Tour Bootleg Style ($24.0, depop)
+fit_card: Scored this insane 2003 tour bootleg tee and I’m obsessed with the
+grungy Y2K vibe. Just listed it on depop for $24.00.
+
+Criterion 2, try 1:
+stopped early: yes — No matching listings were found. Try a higher price, a
+different size, or fewer description words.
+selected_item: (none)
+search_results: 0
+
+Criterion 3, try 1:
+session["selected_item"]["id"]: lst_004
+suggest_outfit new_item: 90s Track Jacket — Navy/White Stripe (lst_004)
+
+Criterion 4, try 1:
+Scored this light wash cropped denim jacket on Poshmark for just $42, and the
+fit is absolute perfection. I'm obsessed with the effortless, cool-girl vibe
+of throwing it over baggy layers. Such a versatile staple for transitional
+weather!
+
+Criterion 5, each try:
+[('lst_012', 20.0), ('lst_024', 18.0), ('lst_033', 19.0),
+ ('lst_014', 12.0), ('lst_034', 14.0), ('lst_020', 16.0),
+ ('lst_002', 18.0)]
+all_at_or_below_20 = True
 ```
 
 ---
@@ -252,15 +285,20 @@ that produced it:
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Full run returns a fit card | 4 of 5 | MET (5/5) | All five runs completed the MCP search, outfit tool, and fit-card tool with a non-empty card. |
+| 2 | Empty search stops before tool 2 | 5 of 5 | MET (5/5) | Every trace ended after the empty MCP search; `selected_item`, outfit, and fit card stayed empty. |
+| 3 | Selected item ID carries through state | 5 of 5 | MET (5/5) | In every run, `lst_004` was selected and the same listing entered `suggest_outfit`. |
+| 4 | Fit-card details | 4 of 5 | MET (5/5) | All five cards contained 2–4 sentences and named both the $42 price and Poshmark. |
+| 5 | Maximum price | 5 of 5 | MET (5/5) | All seven results in every run were $20 or less. |
 
 **Diagnoses**
 
-
+No criterion missed its target, so there is no miss to diagnose. The targets
+were conservative, especially criterion 4. Its checks allowed a misleading
+buyer/seller perspective: several model outputs said the user had "listed" the
+item on the marketplace. The mechanism is in `create_fit_card`: its prompt asks
+for the platform but never says the user found the item there as a buyer. I
+would tighten a future criterion to require an accurate buyer perspective.
 
 ---
 
@@ -278,22 +316,47 @@ that produced it:
 
 **Happy path**
 
-```
-
+```text
+[1] parse_query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey, Vintage Graphic Hoodie — Faded Black … +7 more
+      →    branch: matches found, continue
+[3] suggest_outfit
+      in:  Graphic Tee — 2003 Tour Bootleg Style ($24.0, depop)
+      out: Outfit 1: Y2K Grunge …
+      →    wardrobe items: 10
+[4] create_fit_card
+      in:  item=Graphic Tee — 2003 Tour Bootleg Style; outfit=Outfit 1: Y2K Grunge …
+      out: Scored this ultimate 2003 tour bootleg tee for just $24.00 …
 ```
 
 **Empty search**
 
-```
-
+```text
+[1] parse_query
+      in:  designer ballgown size XXS under $5
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+      →    branch: empty, stop
 ```
 
 **On the MCP move:** <!-- what changed in your code, and whether anything
 behaved differently afterwards. If the rewire didn't work, say exactly where it
 broke — the error text and the last thing that worked. That earns the point in
-full. -->
+full. --> `search_listings` is registered in `mcp_server.py` and
+`agent.py::run_agent` now calls it with `mcp_client.call_tool`. The returned
+list kept the same shape and the agent behavior did not change.
 
+**Required failure checks**
 
+- Empty search: “No matching listings were found. Try a higher price, a different size, or fewer description words.”
+- Empty wardrobe: returned two general outfit ideas and completed normally.
+- Model unavailable: “The model rejected your API key. Check `GEMINI_API_KEY` in your `.env` file, or create a fresh key at aistudio.google.com.”
 
 ---
 
